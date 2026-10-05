@@ -1,0 +1,56 @@
+[
+  {
+    "id": "preset-fb",
+    "name": "Facebook Feed (Góc dưới phải)",
+    "relativeScale": 0.18,
+    "anchorPosition": "bottom-right",
+    "paddingPercent": 0.03,
+    "opacity": 0.95,
+    "rotation": 0,
+    "flipX": false,
+    "flipY": false,
+    "exportOptions": {
+      "format": "jpeg",
+      "quality": 92,
+      "outputFolder": "",
+      "filenameSuffix": "-phuongnam",
+      "overwriteMode": "rename"
+    }
+  },
+  {
+    "id": "preset-zalo",
+    "name": "Zalo / Báo giá (Chính giữa chống trộm)",
+    "relativeScale": 0.4,
+    "anchorPosition": "center",
+    "paddingPercent": 0,
+    "opacity": 0.35,
+    "rotation": 0,
+    "flipX": false,
+    "flipY": false,
+    "exportOptions": {
+      "format": "jpeg",
+      "quality": 90,
+      "outputFolder": "",
+      "filenameSuffix": "-watermark",
+      "overwriteMode": "rename"
+    }
+  },
+  {
+    "id": "preset-ecommerce",
+    "name": "Sàn TMĐT (Góc trên trái)",
+    "relativeScale": 0.15,
+    "anchorPosition": "top-left",
+    "paddingPercent": 0.03,
+    "opacity": 1,
+    "rotation": 0,
+    "flipX": false,
+    "flipY": false,
+    "exportOptions": {
+      "format": "jpeg",
+      "quality": 95,
+      "outputFolder": "",
+      "filenameSuffix": "-branded",
+      "overwriteMode": "rename"
+    }
+  }
+]

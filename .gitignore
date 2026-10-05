@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+dist-electron/
+release/
+
+# Temporary / Scratch
+scratch/
+tests/scratch/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
