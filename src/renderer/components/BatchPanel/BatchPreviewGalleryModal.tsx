@@ -10,6 +10,9 @@ import {
   ArrowDownRight,
   CheckCircle2,
   Trash2,
+  Sliders,
+  Maximize2,
+  Eye,
 } from 'lucide-react';
 import { useBatchStore } from '../../stores/batchStore';
 import { useEditorStore } from '../../stores/editorStore';
@@ -21,7 +24,13 @@ export const BatchPreviewGalleryModal: React.FC = () => {
     smartPlacements,
     isAnalyzingSmartPlacements,
     analyzeSmartPlacements,
+    globalScale,
+    globalOpacity,
+    setGlobalScale,
+    setGlobalOpacity,
     updateItemCorner,
+    updateItemScale,
+    updateItemOpacity,
     removeItemFromGallery,
     startBatchExport,
   } = useBatchStore();
@@ -73,7 +82,7 @@ export const BatchPreviewGalleryModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl flex flex-col h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl flex flex-col h-[92vh] overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-900 via-brand-navy to-slate-900 text-white shrink-0">
           <div className="flex items-center space-x-3">
@@ -88,7 +97,7 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Kiểm tra trực quan vị trí logo trước khi xuất hàng loạt. Bấm các nút góc bên dưới từng ảnh để đổi nhanh nếu muốn.
+                Kiểm tra trực quan vị trí logo trước khi xuất hàng loạt. Tùy chỉnh góc, kích thước và độ mờ cho từng ảnh hoặc toàn bộ.
               </p>
             </div>
           </div>
@@ -115,6 +124,58 @@ export const BatchPreviewGalleryModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Global Toolbar: Real-time Scale & Opacity Adjusters */}
+        <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-2xs">
+          <div className="flex items-center space-x-2 text-xs font-bold text-slate-700">
+            <Sliders className="w-4 h-4 text-emerald-600" />
+            <span>Chỉnh chung cho toàn bộ ({targetImages.length} ảnh):</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Global Size Slider */}
+            <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center space-x-1.5 text-xs text-slate-600">
+                <Maximize2 className="w-3.5 h-3.5 text-brand-teal" />
+                <span className="font-semibold">Kích thước:</span>
+              </div>
+              <input
+                type="range"
+                min="0.08"
+                max="0.45"
+                step="0.01"
+                value={globalScale}
+                onChange={(e) => setGlobalScale(parseFloat(e.target.value))}
+                className="w-28 accent-emerald-600 cursor-pointer"
+                title="Thay đổi kích thước logo áp dụng cho tất cả ảnh"
+              />
+              <span className="text-xs font-mono font-bold text-emerald-700 w-9 text-right">
+                {Math.round(globalScale * 100)}%
+              </span>
+            </div>
+
+            {/* Global Opacity Slider */}
+            <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center space-x-1.5 text-xs text-slate-600">
+                <Eye className="w-3.5 h-3.5 text-brand-teal" />
+                <span className="font-semibold">Độ mờ:</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="1.0"
+                step="0.05"
+                value={globalOpacity}
+                onChange={(e) => setGlobalOpacity(parseFloat(e.target.value))}
+                className="w-28 accent-emerald-600 cursor-pointer"
+                title="Thay đổi độ mờ logo áp dụng cho tất cả ảnh"
+              />
+              <span className="text-xs font-mono font-bold text-emerald-700 w-9 text-right">
+                {Math.round(globalOpacity * 100)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Modal Body: Gallery Grid */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
           {targetImages.length === 0 ? (
@@ -130,7 +191,8 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                 const smart = smartPlacements[img.filePath] || {
                   corner: 'top-right',
                   cornerLabel: 'Góc trên - phải',
-                  scale: 0.20,
+                  scale: globalScale || 0.20,
+                  opacity: globalOpacity ?? 1.0,
                   x: 0.85,
                   y: 0.15,
                   confidence: 1.0,
@@ -138,7 +200,9 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                 };
 
                 const currentCorner = smart.corner;
-                const overlayStyle = getCornerStyle(currentCorner, smart.scale || 0.20);
+                const currentScale = smart.scale || globalScale || 0.20;
+                const currentOpacity = smart.opacity !== undefined ? smart.opacity : globalOpacity;
+                const overlayStyle = getCornerStyle(currentCorner, currentScale);
 
                 return (
                   <div
@@ -171,10 +235,10 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                       {/* Overlaid Logo */}
                       {activeLogo && (
                         <div
-                          className="absolute pointer-events-none select-none transition-all duration-200"
+                          className="absolute pointer-events-none select-none transition-all duration-150"
                           style={{
                             ...overlayStyle,
-                            opacity: logoTransform.opacity,
+                            opacity: currentOpacity,
                             transform: `rotate(${logoTransform.rotation}deg) scaleX(${
                               logoTransform.flipX ? -1 : 1
                             }) scaleY(${logoTransform.flipY ? -1 : 1})`,
@@ -189,8 +253,8 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Card Content & Quick Corner Switcher */}
-                    <div className="p-3 flex flex-col justify-between flex-1 border-t border-slate-100">
+                    {/* Card Content & Adjusters */}
+                    <div className="p-3 flex flex-col justify-between flex-1 border-t border-slate-100 bg-white">
                       <div>
                         <p
                           className="text-xs font-semibold text-slate-800 truncate"
@@ -201,64 +265,108 @@ export const BatchPreviewGalleryModal: React.FC = () => {
                         <div className="flex items-center justify-between mt-1">
                           <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                             <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                            <span>
-                              {smart.cornerLabel} ({Math.round(smart.scale * 100)}%)
-                            </span>
+                            <span>{smart.cornerLabel}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {Math.round(currentScale * 100)}% • mờ {Math.round(currentOpacity * 100)}%
                           </span>
                         </div>
                       </div>
 
-                      {/* 4 Corner Quick Switcher Buttons */}
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
-                        <span className="text-[10px] text-slate-400 font-medium">Đổi góc:</span>
-                        <div className="flex items-center space-x-1">
-                          <button
-                            onClick={() => updateItemCorner(img.filePath, 'top-left')}
-                            title="Chuyển sang Góc trên - trái"
-                            className={`p-1 rounded text-xs transition ${
-                              currentCorner === 'top-left'
-                                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            <ArrowUpLeft className="w-3.5 h-3.5" />
-                          </button>
+                      {/* Individual Adjusters for Size and Opacity */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5">
+                        {/* 4 Corner Quick Switcher Buttons */}
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] text-slate-400 font-medium">Góc:</span>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => updateItemCorner(img.filePath, 'top-left')}
+                              title="Góc trên - trái"
+                              className={`p-1 rounded text-xs transition ${
+                                currentCorner === 'top-left'
+                                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <ArrowUpLeft className="w-3.5 h-3.5" />
+                            </button>
 
-                          <button
-                            onClick={() => updateItemCorner(img.filePath, 'top-right')}
-                            title="Chuyển sang Góc trên - phải"
-                            className={`p-1 rounded text-xs transition ${
-                              currentCorner === 'top-right'
-                                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </button>
+                            <button
+                              onClick={() => updateItemCorner(img.filePath, 'top-right')}
+                              title="Góc trên - phải"
+                              className={`p-1 rounded text-xs transition ${
+                                currentCorner === 'top-right'
+                                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </button>
 
-                          <button
-                            onClick={() => updateItemCorner(img.filePath, 'bottom-left')}
-                            title="Chuyển sang Góc dưới - trái"
-                            className={`p-1 rounded text-xs transition ${
-                              currentCorner === 'bottom-left'
-                                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            <ArrowDownLeft className="w-3.5 h-3.5" />
-                          </button>
+                            <button
+                              onClick={() => updateItemCorner(img.filePath, 'bottom-left')}
+                              title="Góc dưới - trái"
+                              className={`p-1 rounded text-xs transition ${
+                                currentCorner === 'bottom-left'
+                                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <ArrowDownLeft className="w-3.5 h-3.5" />
+                            </button>
 
-                          <button
-                            onClick={() => updateItemCorner(img.filePath, 'bottom-right')}
-                            title="Chuyển sang Góc dưới - phải"
-                            className={`p-1 rounded text-xs transition ${
-                              currentCorner === 'bottom-right'
-                                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            <ArrowDownRight className="w-3.5 h-3.5" />
-                          </button>
+                            <button
+                              onClick={() => updateItemCorner(img.filePath, 'bottom-right')}
+                              title="Góc dưới - phải"
+                              className={`p-1 rounded text-xs transition ${
+                                currentCorner === 'bottom-right'
+                                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <ArrowDownRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Individual Size Slider */}
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <span className="font-medium text-slate-400">Size:</span>
+                          <div className="flex items-center space-x-1.5 flex-1 ml-2 justify-end">
+                            <input
+                              type="range"
+                              min="0.08"
+                              max="0.45"
+                              step="0.01"
+                              value={currentScale}
+                              onChange={(e) => updateItemScale(img.filePath, parseFloat(e.target.value))}
+                              className="w-20 accent-emerald-600 cursor-pointer"
+                              title={`Chỉnh kích thước riêng cho ảnh này: ${Math.round(currentScale * 100)}%`}
+                            />
+                            <span className="font-mono w-7 text-right text-slate-700">
+                              {Math.round(currentScale * 100)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Individual Opacity Slider */}
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <span className="font-medium text-slate-400">Độ mờ:</span>
+                          <div className="flex items-center space-x-1.5 flex-1 ml-2 justify-end">
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="1.0"
+                              step="0.05"
+                              value={currentOpacity}
+                              onChange={(e) => updateItemOpacity(img.filePath, parseFloat(e.target.value))}
+                              className="w-20 accent-emerald-600 cursor-pointer"
+                              title={`Chỉnh độ mờ riêng cho ảnh này: ${Math.round(currentOpacity * 100)}%`}
+                            />
+                            <span className="font-mono w-7 text-right text-slate-700">
+                              {Math.round(currentOpacity * 100)}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

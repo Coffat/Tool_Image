@@ -74,14 +74,14 @@ export const IphoneSyncModal: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-base font-bold">Chuyển ảnh nhanh từ iPhone</h3>
+                <h3 className="text-base font-bold">Đồng Bộ & Chuyển Ảnh 2 Chiều với iPhone</h3>
                 <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   <Wifi className="w-2.5 h-2.5" />
                   <span>Wi-Fi LAN</span>
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                Quét mã QR bằng Camera iPhone để gửi ảnh tức thì sang Studio
+                Gửi ảnh nét căng lên máy tính &amp; Tải ảnh thành phẩm đã gắn logo về điện thoại
               </p>
             </div>
           </div>
@@ -190,9 +190,15 @@ export const IphoneSyncModal: React.FC = () => {
                   <span className="text-emerald-700 font-bold">Sẵn sàng nhận ảnh</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-slate-600 border-t border-emerald-200/60 pt-2">
-                  <span>Số ảnh đã nhận phiên này:</span>
+                  <span>Ảnh đã nhận từ iPhone:</span>
                   <span className="font-bold text-slate-900 text-sm bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
                     {iphoneStatus?.receivedCount || 0} ảnh
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600 border-t border-emerald-200/60 pt-2">
+                  <span>Ảnh thành phẩm sẵn sàng tải về:</span>
+                  <span className="font-bold text-emerald-800 text-sm bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-300 shadow-2xs">
+                    {iphoneStatus?.exportCount || 0} ảnh
                   </span>
                 </div>
               </div>

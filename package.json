@@ -1,6 +1,6 @@
 {
   "name": "phuong-nam-product-studio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Desktop Application for Branding & Watermarking Product Photos - Thuoc Thu Y Phuong Nam",
   "type": "module",
   "main": "dist-electron/index.js",
@@ -13,10 +13,12 @@
     "package:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "archiver": "^8.0.0",
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",
     "konva": "^9.3.18",
     "lucide-react": "^0.441.0",
+    "onnxruntime-node": "^1.20.1",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@esbuild/darwin-arm64": "^0.28.2",
+    "@types/archiver": "^8.0.0",
     "@types/node": "^20.16.5",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.5",
@@ -56,5 +59,8 @@
   "optionalDependencies": {
     "@img/sharp-libvips-win32-x64": "npm:null@^2.0.0",
     "@img/sharp-win32-x64": "^0.33.5"
+  },
+  "allowScripts": {
+    "onnxruntime-node@1.20.1": true
   }
 }

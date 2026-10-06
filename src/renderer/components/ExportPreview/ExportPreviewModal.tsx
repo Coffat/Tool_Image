@@ -26,6 +26,7 @@ export const ExportPreviewModal: React.FC = () => {
     enhancedPreviewUrl,
     enhancedWidth,
     enhancedHeight,
+    enhancedFilePath,
     isExporting,
     closeModal,
     setApplyAiEnhance,
@@ -45,7 +46,6 @@ export const ExportPreviewModal: React.FC = () => {
     logoTransform,
     exportOptions,
     setExportOptions,
-    enhanceImageAction,
   } = useEditorStore();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -62,7 +62,7 @@ export const ExportPreviewModal: React.FC = () => {
 
     // If image already enhanced previously
     if (activeImg.isEnhanced) {
-      setEnhancedData(activeImg.previewUrl, activeImg.originalWidth, activeImg.originalHeight);
+      setEnhancedData(activeImg.previewUrl, activeImg.originalWidth, activeImg.originalHeight, activeImg.filePath);
       return;
     }
 
@@ -76,7 +76,7 @@ export const ExportPreviewModal: React.FC = () => {
           .then((res) => {
             if (isMounted) {
               const url = `${formatLocalImageUrl(res.enhancedPath)}?t=${Date.now()}`;
-              setEnhancedData(url, res.newWidth, res.newHeight);
+              setEnhancedData(url, res.newWidth, res.newHeight, res.enhancedPath);
               setIsGeneratingEnhancedPreview(false);
             }
           })
@@ -140,10 +140,12 @@ export const ExportPreviewModal: React.FC = () => {
 
       // If user enabled AI enhance, apply enhancement first if not already done
       if (applyAiEnhance && !activeImg.isEnhanced) {
-        const enhanceResult = await window.electronAPI.enhanceImage(activeImg.filePath);
-        finalImagePath = enhanceResult.enhancedPath;
-        // Also update editor store state
-        await enhanceImageAction(activeImg.id);
+        if (enhancedFilePath) {
+          finalImagePath = enhancedFilePath;
+        } else {
+          const enhanceResult = await window.electronAPI.enhanceImage(activeImg.filePath);
+          finalImagePath = enhanceResult.enhancedPath;
+        }
       }
 
       const res = await window.electronAPI.exportSingle({
@@ -162,13 +164,17 @@ export const ExportPreviewModal: React.FC = () => {
         exportOptions,
       });
 
-      alert(
+      const sendToMobile = confirm(
         `🎉 Xuất ảnh thành công!\n\n` +
           `• Kích thước: ${res.width} × ${res.height} px\n` +
           `• Định dạng: ${exportOptions.format.toUpperCase()}\n` +
-          `• Vị trí lưu: ${res.outputPath}`
+          `• Vị trí lưu: ${res.outputPath}\n\n` +
+          `Bạn có muốn mở mã QR để chuyển ngay ảnh này về điện thoại không?`
       );
       closeModal();
+      if (sendToMobile) {
+        useEditorStore.getState().setIphoneModalOpen(true);
+      }
     } catch (err: any) {
       console.error('Export failed:', err);
       alert(`Lỗi xuất ảnh: ${err?.message || err}`);

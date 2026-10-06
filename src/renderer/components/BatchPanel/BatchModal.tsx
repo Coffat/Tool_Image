@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, CheckCircle2, AlertCircle, Loader2, StopCircle, Sparkles, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Loader2, StopCircle, Sparkles, RefreshCw, Smartphone } from 'lucide-react';
 import { useBatchStore } from '../../stores/batchStore';
 import { useEditorStore } from '../../stores/editorStore';
 
@@ -293,20 +293,34 @@ export const BatchModal: React.FC = () => {
               </button>
             ) : (
               <>
+                {summary && summary.successCount > 0 && (
+                  <button
+                    onClick={() => {
+                      closeModal();
+                      useEditorStore.getState().setIphoneModalOpen(true);
+                    }}
+                    className="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-brand-navy hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition"
+                  >
+                    <Smartphone className="w-4 h-4 text-emerald-400" />
+                    <span>Tải về điện thoại qua QR</span>
+                  </button>
+                )}
                 <button
                   onClick={closeModal}
                   className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-xs font-medium text-slate-700 transition"
                 >
                   {summary ? 'Đóng' : 'Hủy bỏ'}
                 </button>
-                <button
-                  onClick={() => startBatchExport()}
-                  disabled={images.length === 0}
-                  className="flex items-center space-x-1.5 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
-                >
-                  <Loader2 className="w-4 h-4 hidden" />
-                  <span>Bắt đầu xuất hàng loạt</span>
-                </button>
+                {!summary && (
+                  <button
+                    onClick={() => startBatchExport()}
+                    disabled={images.length === 0}
+                    className="flex items-center space-x-1.5 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  >
+                    <Loader2 className="w-4 h-4 hidden" />
+                    <span>Bắt đầu xuất hàng loạt</span>
+                  </button>
+                )}
               </>
             )}
           </div>

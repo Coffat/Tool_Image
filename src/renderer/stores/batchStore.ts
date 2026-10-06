@@ -4,6 +4,38 @@ import { ProcessImageParams } from '../../main/services/imageProcessor';
 import { SmartPlacementResult } from '../../shared/types';
 import { useEditorStore } from './editorStore';
 
+function computeCornerCoordinates(
+  corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right',
+  scale: number
+): { x: number; y: number } {
+  const padding = 0.035;
+  let x = 0.5;
+  let y = 0.5;
+  switch (corner) {
+    case 'top-left':
+      x = padding + scale / 2;
+      y = padding + scale / 2;
+      break;
+    case 'top-right':
+      x = 1.0 - padding - scale / 2;
+      y = padding + scale / 2;
+      break;
+    case 'bottom-left':
+      x = padding + scale / 2;
+      y = 1.0 - padding - scale / 2;
+      break;
+    case 'bottom-right':
+    default:
+      x = 1.0 - padding - scale / 2;
+      y = 1.0 - padding - scale / 2;
+      break;
+  }
+  return {
+    x: Math.round(x * 1000) / 1000,
+    y: Math.round(y * 1000) / 1000,
+  };
+}
+
 interface BatchState {
   isOpen: boolean;
   isProcessing: boolean;
@@ -12,6 +44,8 @@ interface BatchState {
   smartPlacementEnabled: boolean;
   smartPlacements: Record<string, SmartPlacementResult>;
   isAnalyzingSmartPlacements: boolean;
+  globalScale: number;
+  globalOpacity: number;
   progress: BatchItemProgress | null;
   summary: BatchSummary | null;
 
@@ -26,6 +60,10 @@ interface BatchState {
     filePath: string,
     corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   ) => void;
+  updateItemScale: (filePath: string, scale: number) => void;
+  updateItemOpacity: (filePath: string, opacity: number) => void;
+  setGlobalScale: (scale: number) => void;
+  setGlobalOpacity: (opacity: number) => void;
   removeItemFromGallery: (id: string) => void;
   startBatchExport: (onlySelected?: boolean) => Promise<void>;
   cancelBatchExport: () => Promise<void>;
@@ -39,6 +77,8 @@ export const useBatchStore = create<BatchState>((set, get) => ({
   smartPlacementEnabled: true,
   smartPlacements: {},
   isAnalyzingSmartPlacements: false,
+  globalScale: 0.20,
+  globalOpacity: 1.0,
   progress: null,
   summary: null,
 
@@ -53,7 +93,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   analyzeSmartPlacements: async () => {
     const editor = useEditorStore.getState();
-    const { images, selectedImageIds } = editor;
+    const { images, selectedImageIds, logoTransform } = editor;
     const targetImages =
       selectedImageIds.length > 0
         ? images.filter((img) => selectedImageIds.includes(img.id))
@@ -66,8 +106,17 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       try {
         const filePaths = targetImages.map((i) => i.filePath);
         const results = await window.electronAPI.detectBatchSmartPlacement(filePaths);
+        // Ensure default opacity from logoTransform if not present
+        const defaultOp = logoTransform?.opacity ?? get().globalOpacity ?? 1.0;
+        const normalizedResults: Record<string, SmartPlacementResult> = {};
+        for (const [key, res] of Object.entries(results)) {
+          normalizedResults[key] = {
+            ...res,
+            opacity: res.opacity !== undefined ? res.opacity : defaultOp,
+          };
+        }
         set((state) => ({
-          smartPlacements: { ...state.smartPlacements, ...results },
+          smartPlacements: { ...state.smartPlacements, ...normalizedResults },
           isAnalyzingSmartPlacements: false,
         }));
       } catch (err) {
@@ -91,7 +140,14 @@ export const useBatchStore = create<BatchState>((set, get) => ({
   },
 
   openGalleryPreview: () => {
-    set({ isGalleryPreviewOpen: true });
+    const editor = useEditorStore.getState();
+    const initialOp = editor.logoTransform?.opacity ?? 1.0;
+    const initialScale = editor.logoTransform?.width || 0.20;
+    set({
+      isGalleryPreviewOpen: true,
+      globalOpacity: initialOp,
+      globalScale: initialScale,
+    });
     get().analyzeSmartPlacements();
   },
 
@@ -105,39 +161,21 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       cornerLabel: 'Góc trên - phải',
       x: 0.85,
       y: 0.15,
-      scale: 0.20,
+      scale: get().globalScale || 0.20,
+      opacity: get().globalOpacity ?? 1.0,
       confidence: 1.0,
       description: 'Đã tùy chỉnh thủ công',
     };
 
     const scale = current.scale || 0.20;
-    const padding = 0.035;
-    let x = 0.5;
-    let y = 0.5;
-    let cornerLabel = 'Góc trên - phải';
-
-    switch (corner) {
-      case 'top-left':
-        x = padding + scale / 2;
-        y = padding + scale / 2;
-        cornerLabel = 'Góc trên - trái';
-        break;
-      case 'top-right':
-        x = 1.0 - padding - scale / 2;
-        y = padding + scale / 2;
-        cornerLabel = 'Góc trên - phải';
-        break;
-      case 'bottom-left':
-        x = padding + scale / 2;
-        y = 1.0 - padding - scale / 2;
-        cornerLabel = 'Góc dưới - trái';
-        break;
-      case 'bottom-right':
-        x = 1.0 - padding - scale / 2;
-        y = 1.0 - padding - scale / 2;
-        cornerLabel = 'Góc dưới - phải';
-        break;
-    }
+    const { x, y } = computeCornerCoordinates(corner, scale);
+    const cornerLabels = {
+      'top-left': 'Góc trên - trái',
+      'top-right': 'Góc trên - phải',
+      'bottom-left': 'Góc dưới - trái',
+      'bottom-right': 'Góc dưới - phải',
+    };
+    const cornerLabel = cornerLabels[corner] || 'Góc trên - phải';
 
     set((state) => ({
       smartPlacements: {
@@ -146,12 +184,124 @@ export const useBatchStore = create<BatchState>((set, get) => ({
           ...current,
           corner,
           cornerLabel,
-          x: Math.round(x * 1000) / 1000,
-          y: Math.round(y * 1000) / 1000,
+          x,
+          y,
           description: `Đã đổi sang ${cornerLabel}`,
         },
       },
     }));
+  },
+
+  updateItemScale: (filePath, scale) => {
+    const current = get().smartPlacements[filePath] || {
+      corner: 'top-right',
+      cornerLabel: 'Góc trên - phải',
+      x: 0.85,
+      y: 0.15,
+      scale: 0.20,
+      opacity: get().globalOpacity ?? 1.0,
+      confidence: 1.0,
+      description: 'Đã tùy chỉnh thủ công',
+    };
+    const clampedScale = Math.max(0.05, Math.min(0.8, Math.round(scale * 100) / 100));
+    const { x, y } = computeCornerCoordinates(current.corner, clampedScale);
+
+    set((state) => ({
+      smartPlacements: {
+        ...state.smartPlacements,
+        [filePath]: {
+          ...current,
+          scale: clampedScale,
+          x,
+          y,
+        },
+      },
+    }));
+  },
+
+  updateItemOpacity: (filePath, opacity) => {
+    const current = get().smartPlacements[filePath] || {
+      corner: 'top-right',
+      cornerLabel: 'Góc trên - phải',
+      x: 0.85,
+      y: 0.15,
+      scale: get().globalScale || 0.20,
+      opacity: 1.0,
+      confidence: 1.0,
+      description: 'Đã tùy chỉnh thủ công',
+    };
+    const clampedOpacity = Math.max(0.05, Math.min(1.0, Math.round(opacity * 100) / 100));
+
+    set((state) => ({
+      smartPlacements: {
+        ...state.smartPlacements,
+        [filePath]: {
+          ...current,
+          opacity: clampedOpacity,
+        },
+      },
+    }));
+  },
+
+  setGlobalScale: (scale) => {
+    const clampedScale = Math.max(0.05, Math.min(0.8, Math.round(scale * 100) / 100));
+    const currentPlacements = { ...get().smartPlacements };
+    const editor = useEditorStore.getState();
+    const targetImages = editor.images;
+
+    for (const img of targetImages) {
+      const cur = currentPlacements[img.filePath] || {
+        corner: 'top-right',
+        cornerLabel: 'Góc trên - phải',
+        x: 0.85,
+        y: 0.15,
+        scale: 0.20,
+        opacity: get().globalOpacity ?? 1.0,
+        confidence: 1.0,
+        description: 'Vị trí mặc định',
+      };
+      const { x, y } = computeCornerCoordinates(cur.corner, clampedScale);
+      currentPlacements[img.filePath] = {
+        ...cur,
+        scale: clampedScale,
+        x,
+        y,
+      };
+    }
+
+    set({
+      globalScale: clampedScale,
+      smartPlacements: currentPlacements,
+    });
+  },
+
+  setGlobalOpacity: (opacity) => {
+    const clampedOpacity = Math.max(0.05, Math.min(1.0, Math.round(opacity * 100) / 100));
+    const currentPlacements = { ...get().smartPlacements };
+    const editor = useEditorStore.getState();
+    const targetImages = editor.images;
+
+    for (const img of targetImages) {
+      const cur = currentPlacements[img.filePath] || {
+        corner: 'top-right',
+        cornerLabel: 'Góc trên - phải',
+        x: 0.85,
+        y: 0.15,
+        scale: get().globalScale || 0.20,
+        opacity: 1.0,
+        confidence: 1.0,
+        description: 'Vị trí mặc định',
+      };
+      currentPlacements[img.filePath] = {
+        ...cur,
+        opacity: clampedOpacity,
+      };
+    }
+
+    set({
+      globalOpacity: clampedOpacity,
+      smartPlacements: currentPlacements,
+    });
   },
 
   removeItemFromGallery: (id) => {
@@ -215,7 +365,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
           relWidth: smart ? smart.scale : logoTransform.width,
           relHeight: smart ? smart.scale : logoTransform.height,
           rotation: logoTransform.rotation,
-          opacity: logoTransform.opacity,
+          opacity: smart?.opacity !== undefined ? smart.opacity : logoTransform.opacity,
           flipX: logoTransform.flipX,
           flipY: logoTransform.flipY,
         },
@@ -233,27 +383,31 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       summary: null,
     });
 
-    // Listen to progress updates
     const unsubscribe = window.electronAPI.onBatchProgress((p) => {
       set({ progress: p });
     });
 
     try {
-      const result = await window.electronAPI.startBatch(items);
-      set({ summary: result, isProcessing: false });
+      const summary = await window.electronAPI.startBatch(items);
+      set({
+        summary,
+        isProcessing: false,
+      });
     } catch (err: any) {
       console.error('Batch export failed:', err);
-      set({ isProcessing: false });
+      set({
+        isProcessing: false,
+      });
     } finally {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     }
   },
 
   cancelBatchExport: async () => {
-    try {
+    if (window.electronAPI?.cancelBatch) {
       await window.electronAPI.cancelBatch();
-    } catch (err) {
-      console.error('Failed to cancel batch:', err);
     }
   },
 }));

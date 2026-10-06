@@ -50,7 +50,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['sharp'],
+              external: ['sharp', 'onnxruntime-node'],
             },
           },
         },

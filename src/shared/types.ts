@@ -25,7 +25,16 @@ export interface IphoneSyncStatus {
   url: string;
   qrCodeDataUrl: string;
   receivedCount: number;
+  exportCount?: number;
   savedFolder: string;
+}
+
+export interface ExportedMobileItem {
+  id: string;
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  exportTime: string;
 }
 
 export interface SmartPlacementResult {
@@ -34,6 +43,7 @@ export interface SmartPlacementResult {
   x: number;
   y: number;
   scale: number;
+  opacity?: number;
   confidence: number;
   description: string;
 }

@@ -14,11 +14,20 @@
     "dist-electron",
     "assets",
     "node_modules/sharp/**/*",
-    "node_modules/@img/**/*"
+    "node_modules/@img/**/*",
+    "node_modules/onnxruntime-node/**/*"
   ],
   "asarUnpack": [
     "**/node_modules/sharp/**/*",
-    "**/node_modules/@img/**/*"
+    "**/node_modules/@img/**/*",
+    "**/node_modules/onnxruntime-node/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "models",
+      "to": "models",
+      "filter": ["**/*"]
+    }
   ],
   "mac": {
     "target": ["dmg", "zip"],

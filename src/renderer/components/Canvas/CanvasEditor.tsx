@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
-import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Sparkles, Loader2, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, RotateCcw, Sparkles, Loader2, X, Search, Move } from 'lucide-react';
 import { useEditorStore } from '../../stores/editorStore';
 import { pickImages } from '../../utils/filePicker';
 
@@ -26,6 +26,7 @@ export const CanvasEditor: React.FC = () => {
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [baseHtmlImage, setBaseHtmlImage] = useState<HTMLImageElement | null>(null);
   const [logoHtmlImage, setLogoHtmlImage] = useState<HTMLImageElement | null>(null);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
   const activeImage = images.find((i) => i.id === activeImageId);
   const activeLogo =
@@ -86,23 +87,45 @@ export const CanvasEditor: React.FC = () => {
     }
   }, [baseHtmlImage, logoHtmlImage, activeImageId]);
 
+  // 5. Force ultra-high quality smoothing on canvas 2D contexts (prevent jagged/blurry text)
+  useEffect(() => {
+    if (stageRef.current) {
+      const stage = stageRef.current;
+      const layers = stage.getLayers();
+      for (const layer of layers) {
+        const canvas = layer.getCanvas();
+        if (canvas && canvas._canvas) {
+          const ctx = canvas._canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+          }
+        }
+      }
+    }
+  }, [baseHtmlImage, logoHtmlImage, zoom, containerSize, stagePos]);
+
   // Calculate base image display bounds on canvas
   let baseDisplayW = 0;
   let baseDisplayH = 0;
   let baseOffsetX = 0;
   let baseOffsetY = 0;
+  let fittedW = 1;
+  let fittedH = 1;
+  let naturalW = 1;
+  let naturalH = 1;
 
   if (baseHtmlImage && containerSize.width > 0 && containerSize.height > 0) {
     const padding = 40;
     const availW = Math.max(100, containerSize.width - padding);
     const availH = Math.max(100, containerSize.height - padding);
 
-    const naturalW = baseHtmlImage.naturalWidth || 1;
-    const naturalH = baseHtmlImage.naturalHeight || 1;
+    naturalW = baseHtmlImage.naturalWidth || 1;
+    naturalH = baseHtmlImage.naturalHeight || 1;
     const aspect = naturalW / naturalH;
 
-    let fittedW = availW;
-    let fittedH = availW / aspect;
+    fittedW = availW;
+    fittedH = availW / aspect;
 
     if (fittedH > availH) {
       fittedH = availH;
@@ -115,17 +138,34 @@ export const CanvasEditor: React.FC = () => {
     baseOffsetY = (containerSize.height - baseDisplayH) / 2;
   }
 
+  // 1:1 Actual Pixel Zoom ratio
+  const ratio100 = naturalW > 0 && fittedW > 0 ? naturalW / fittedW : 1.0;
+  const is100Zoom = Math.abs(zoom - ratio100) < 0.05;
+
+  const handleToggle100Zoom = () => {
+    if (is100Zoom) {
+      setZoom(1.0);
+      setStagePos({ x: 0, y: 0 });
+    } else {
+      setZoom(Math.round(ratio100 * 100) / 100);
+    }
+  };
+
+  const handleResetFit = () => {
+    setZoom(1.0);
+    setStagePos({ x: 0, y: 0 });
+  };
+
   // Calculate Logo dimensions and coordinates in canvas space
   const logoPixelW = baseDisplayW * logoTransform.width;
   const logoPixelH = baseDisplayH * logoTransform.height;
   const logoCenterPixelX = baseOffsetX + baseDisplayW * logoTransform.x;
   const logoCenterPixelY = baseOffsetY + baseDisplayH * logoTransform.y;
 
-  // Drag End handler
+  // Drag End handler for logo
   const handleDragEnd = (e: any) => {
     if (baseDisplayW <= 0 || baseDisplayH <= 0) return;
     const node = e.target;
-    // Current center in canvas
     const newCenterX = node.x();
     const newCenterY = node.y();
 
@@ -135,7 +175,7 @@ export const CanvasEditor: React.FC = () => {
     updateLogoTransform({ x: relX, y: relY }, true);
   };
 
-  // Transform (Resize / Rotate) End handler
+  // Transform (Resize / Rotate) End handler for logo
   const handleTransformEnd = () => {
     const node = logoRef.current;
     if (!node || baseDisplayW <= 0 || baseDisplayH <= 0) return;
@@ -155,7 +195,6 @@ export const CanvasEditor: React.FC = () => {
     const relX = (newCenterX - baseOffsetX) / baseDisplayW;
     const relY = (newCenterY - baseOffsetY) / baseDisplayH;
 
-    // Reset node scale so Konva doesn't accumulate scaling factors
     node.scaleX(logoTransform.flipX ? -1 : 1);
     node.scaleY(logoTransform.flipY ? -1 : 1);
 
@@ -176,7 +215,7 @@ export const CanvasEditor: React.FC = () => {
       ref={containerRef}
       className="flex-1 relative bg-slate-200/80 overflow-hidden flex items-center justify-center select-none"
     >
-      {/* Background checkerboard pattern for transparent canvas preview */}
+      {/* Background checkerboard pattern */}
       <div
         className="absolute inset-0 opacity-20 pointer-events-none"
         style={{
@@ -233,10 +272,18 @@ export const CanvasEditor: React.FC = () => {
           ref={stageRef}
           width={containerSize.width}
           height={containerSize.height}
+          x={stagePos.x}
+          y={stagePos.y}
+          draggable={zoom > 1.2}
+          onDragEnd={(e) => {
+            if (e.target === stageRef.current) {
+              setStagePos({ x: e.target.x(), y: e.target.y() });
+            }
+          }}
           pixelRatio={typeof window !== 'undefined' ? Math.max(window.devicePixelRatio || 1, 2) : 1}
-          className="cursor-default"
+          className={zoom > 1.2 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
         >
-          {/* Base Product Layer */}
+          {/* Base Product Layer - Clean & Crisp rendering without blur-inducing shadow */}
           <Layer>
             <KonvaImage
               image={baseHtmlImage}
@@ -244,11 +291,8 @@ export const CanvasEditor: React.FC = () => {
               y={baseOffsetY}
               width={baseDisplayW}
               height={baseDisplayH}
-              shadowColor="black"
-              shadowBlur={20}
-              shadowOpacity={0.15}
-              shadowOffsetX={0}
-              shadowOffsetY={8}
+              listening={false}
+              perfectDrawEnabled={false}
             />
           </Layer>
 
@@ -286,17 +330,16 @@ export const CanvasEditor: React.FC = () => {
                   'bottom-center',
                 ]}
                 boundBoxFunc={(oldBox, newBox) => {
-                  // Minimum size limit: 15px
                   if (Math.abs(newBox.width) < 15 || Math.abs(newBox.height) < 15) {
                     return oldBox;
                   }
                   return newBox;
                 }}
-                anchorCornerRadius={3}
                 anchorSize={8}
-                anchorFill="#10B981"
-                anchorStroke="#FFFFFF"
-                anchorStrokeWidth={1.5}
+                anchorCornerRadius={4}
+                anchorFill="#FFFFFF"
+                anchorStroke="#10B981"
+                anchorStrokeWidth={2}
                 borderStroke="#10B981"
                 borderStrokeWidth={1.5}
                 borderDash={[4, 4]}
@@ -330,19 +373,19 @@ export const CanvasEditor: React.FC = () => {
       {/* Floating Canvas Toolbar Controls (Bottom Center) */}
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-1 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200/80 text-slate-700 select-none">
         <button
-          onClick={() => setZoom(zoom - 0.1)}
+          onClick={() => setZoom(Math.max(0.2, Math.round((zoom - 0.1) * 10) / 10))}
           title="Thu nhỏ"
           className="p-1 rounded-full hover:bg-slate-100 transition"
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
 
-        <span className="text-[11px] font-mono font-medium px-2 text-slate-600 min-w-11 text-center">
+        <span className="text-[11px] font-mono font-bold px-1.5 text-slate-700 min-w-11 text-center">
           {Math.round(zoom * 100)}%
         </span>
 
         <button
-          onClick={() => setZoom(zoom + 0.1)}
+          onClick={() => setZoom(Math.min(5.0, Math.round((zoom + 0.1) * 10) / 10))}
           title="Phóng to"
           className="p-1 rounded-full hover:bg-slate-100 transition"
         >
@@ -351,14 +394,38 @@ export const CanvasEditor: React.FC = () => {
 
         <div className="h-3.5 w-px bg-slate-200 mx-1" />
 
+        {/* 100% 1:1 Pixel Inspection Button */}
         <button
-          onClick={() => setZoom(1.0)}
-          title="Vừa màn hình (Fit)"
-          className="flex items-center space-x-1 px-2 py-0.5 rounded-full hover:bg-slate-100 text-[11px] font-medium transition"
+          onClick={handleToggle100Zoom}
+          title="Xem ảnh theo tỷ lệ pixel 1:1 gốc để soi rõ từng dòng chữ nhỏ trên nhãn thuốc"
+          className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition ${
+            is100Zoom
+              ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+              : 'hover:bg-slate-100 text-slate-700'
+          }`}
+        >
+          <Search className="w-3 h-3 text-emerald-500" />
+          <span>{is100Zoom ? 'Đang soi 100% (1:1)' : 'Soi chi tiết 100%'}</span>
+        </button>
+
+        {/* Fit Button */}
+        <button
+          onClick={handleResetFit}
+          title="Thu vừa khung màn hình"
+          className="flex items-center space-x-1 px-2 py-0.5 rounded-full hover:bg-slate-100 text-[11px] font-medium text-slate-600 transition"
         >
           <Maximize2 className="w-3 h-3" />
           <span>Vừa khung</span>
         </button>
+
+        {zoom > 1.2 && (
+          <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-500 font-medium">
+            <Move className="w-2.5 h-2.5" />
+            <span>Kéo chuột để di chuyển ảnh</span>
+          </div>
+        )}
+
+        <div className="h-3.5 w-px bg-slate-200 mx-1" />
 
         <button
           onClick={() => useEditorStore.getState().resetLogoTransform()}

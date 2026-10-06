@@ -119,7 +119,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
   // 5. Single Image Export
   ipcMain.handle('image:exportSingle', async (_event, params: ProcessImageParams) => {
-    return await ImageProcessor.processAndExport(params);
+    const res = await ImageProcessor.processAndExport(params);
+    if (res && res.outputPath) {
+      IphoneServer.getInstance().registerExportedImages([res.outputPath]);
+    }
+    return res;
   });
 
   // 6. Batch Image Export
@@ -131,6 +135,15 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         mainWindow.webContents.send('batch:progress', progress);
       }
     });
+
+    if (summary && summary.results) {
+      const successfulPaths = summary.results
+        .filter((r) => r.status === 'success' && r.outputPath)
+        .map((r) => r.outputPath as string);
+      if (successfulPaths.length > 0) {
+        IphoneServer.getInstance().registerExportedImages(successfulPaths);
+      }
+    }
 
     activeBatchQueue = null;
     return summary;

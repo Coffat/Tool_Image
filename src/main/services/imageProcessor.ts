@@ -111,9 +111,26 @@ export class ImageProcessor {
     const origCenterY = Math.round(transform.relCenterY * origH);
 
     // Resize with high-order Lanczos3 + edge sharpening for razor-sharp logo details
+    // Use 'contain' to preserve logo aspect ratio (prevents circular logos from being squished)
+    const logoMeta = await sharp(logoPath).metadata();
+    const logoOrigW = logoMeta.width || 1;
+    const logoOrigH = logoMeta.height || 1;
+    const logoAspect = logoOrigW / logoOrigH;
+
+    // Calculate dimensions that fit within bounding box while preserving aspect ratio
+    let fitW = targetW;
+    let fitH = targetH;
+    if (targetW / targetH > logoAspect) {
+      // Bounding box is wider than logo → constrain by height
+      fitW = Math.max(1, Math.round(targetH * logoAspect));
+    } else {
+      // Bounding box is taller than logo → constrain by width
+      fitH = Math.max(1, Math.round(targetW / logoAspect));
+    }
+
     let logoPipeline = sharp(logoPath)
       .ensureAlpha()
-      .resize(targetW, targetH, {
+      .resize(fitW, fitH, {
         fit: 'fill',
         kernel: sharp.kernel.lanczos3,
         fastShrinkOnLoad: false,
@@ -239,7 +256,11 @@ export class ImageProcessor {
     const quality = Math.max(10, Math.min(100, exportOptions.quality || 92));
 
     if (format === 'jpeg') {
-      compositePipeline = compositePipeline.jpeg({ quality, mozjpeg: true });
+      compositePipeline = compositePipeline.jpeg({
+        quality,
+        chromaSubsampling: '4:4:4',
+        mozjpeg: true,
+      });
     } else if (format === 'png') {
       compositePipeline = compositePipeline.png({ compressionLevel: 8 });
     } else if (format === 'webp') {
